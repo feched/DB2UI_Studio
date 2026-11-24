@@ -1,0 +1,16 @@
+# Автоопределение текстовых файлов
+* text=auto
+
+# Windows-скрипты должны оставаться с CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+*.iss text eol=crlf
+
+# Бинарные файлы
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.exe binary
+*.zip binary

@@ -1,0 +1,4 @@
+flask>=3.0,<4
+psycopg2-binary>=2.9.9,<3
+python-dotenv>=1.0,<2
+pywebview>=6.0,<7

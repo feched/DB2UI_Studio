@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ app_name }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='runtime.css') }}">
+</head>
+<body>
+  <div id="rt-app" class="rt-app"></div>
+  <div id="rt-toast" class="rt-toast" hidden></div>
+
+  <dialog id="rt-record-dialog" class="record-dialog">
+    <form id="rt-record-form">
+      <header class="dialog-head">
+        <h2 id="rt-record-title">Запись</h2>
+        <button type="button" class="icon-btn" data-rt-close-dialog title="Закрыть">×</button>
+      </header>
+      <div id="rt-record-fields" class="dialog-fields"></div>
+      <div id="rt-record-error" class="error-box" hidden></div>
+      <footer class="dialog-foot">
+        <button type="button" class="btn btn-ghost" data-rt-close-dialog>Отмена</button>
+        <button type="submit" id="rt-record-save" class="btn btn-primary">Сохранить</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <dialog id="rt-connect-dialog" class="record-dialog">
+    <form id="rt-connect-dialog-form">
+      <header class="dialog-head">
+        <h2>Подключение к базе данных</h2>
+        <button type="button" class="icon-btn" data-rt-close-dialog title="Закрыть">×</button>
+      </header>
+      <div id="rt-connect-dialog-body" class="dialog-body"></div>
+      <div id="rt-connect-dialog-error" class="error-box" hidden></div>
+      <footer class="dialog-foot">
+        <button type="button" class="btn btn-ghost" data-rt-close-dialog>Отмена</button>
+        <button type="submit" id="rt-connect-dialog-save" class="btn btn-primary">Подключиться</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

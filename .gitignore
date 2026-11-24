@@ -1,0 +1,33 @@
+# Окружения Python
+.venv/
+
+# Кэш Python
+__pycache__/
+*.pyc
+
+# Секреты и ключи
+.env
+secret.key
+desktop.log
+.streamlit/secrets.toml
+
+# Настройки IDE
+.idea/
+
+# Пользовательские данные (если там не лежит исходный код)
+projects/
+
+# Сборка десктопной версии
+build/
+dist/
+*.spec.bak
+
+# Системный мусор и логи (на всякий случай)
+test_portable_build
+Thumbs.db
+.DS_Store
+
+# Личные заметки, не для публикации
+Текстовый документ.txt
+# Профиль встроенного браузера WebView2
+webview/

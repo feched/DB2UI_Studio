@@ -1,0 +1,746 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DB2UI Studio — конструктор интерфейсов для PostgreSQL</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<div id="toast" class="toast" hidden></div>
+
+<!-- ===================== ЭКРАН ПОДКЛЮЧЕНИЯ ===================== -->
+<section id="connect-screen" class="connect-screen">
+  <div class="connect-card">
+    <div class="brand brand-lg">DB2UI <span>Studio</span></div>
+    <h1>Подключите базу данных</h1>
+    <p class="muted">
+      Введите параметры PostgreSQL. После подключения появятся ваши таблицы,
+      из которых можно собирать интерфейс без программирования.
+    </p>
+
+    <div id="connect-intro" class="connect-intro">
+      <button type="button" id="connect-start-btn" class="btn btn-primary btn-block">
+        Подключить
+      </button>
+      <button type="button" id="connect-new-btn" class="btn btn-ghost btn-block">
+        ＋ Новый проект
+      </button>
+      <p class="hint">
+        «Подключить» откроет последний проект этой базы, «Новый проект» —
+        создаст пустой интерфейс после подключения.
+      </p>
+    </div>
+
+    <form id="connect-form" autocomplete="off" hidden>
+      <div class="connect-grid">
+        <label class="field">
+          <span>Сервер</span>
+          <input name="host" value="{{ defaults.host }}" placeholder="localhost" required>
+        </label>
+        <label class="field">
+          <span>База данных</span>
+          <input name="dbname" value="{{ defaults.dbname }}" placeholder="postgres" required>
+        </label>
+        <label class="field">
+          <span>Пользователь</span>
+          <input name="user" value="{{ defaults.user }}" placeholder="postgres" required>
+        </label>
+        <label class="field">
+          <span>Пароль</span>
+          <input name="password" type="password" value="{{ defaults.password }}" placeholder="пароль">
+        </label>
+      </div>
+
+      <details class="advanced">
+        <summary>Дополнительно</summary>
+        <label class="field field-port">
+          <span>Порт</span>
+          <input name="port" type="number" min="1" max="65535" value="{{ defaults.port }}">
+        </label>
+      </details>
+
+      <div id="connect-error" class="error-box" hidden></div>
+
+      <button class="btn btn-primary btn-block" type="submit" id="connect-btn">
+        Подключиться
+      </button>
+    </form>
+
+    <p class="hint" id="connect-hint" hidden>
+      Пароль используется только для подключения в этой сессии и не записывается
+      в файлы проекта. Настройки по умолчанию можно изменить в файле <code>.env</code>.
+    </p>
+  </div>
+  <div class="connect-footer">DB2UI Studio · учебный no-code конструктор</div>
+</section>
+
+<!-- ===================== РЕДАКТОР ===================== -->
+<section id="builder" class="app" hidden>
+  <header class="topbar">
+    <div class="brand">DB2UI <span>Studio</span></div>
+    <div class="db-chip" title="Текущая база данных">
+      <span class="status-dot"></span>
+      <span id="db-label">—</span>
+    </div>
+    <div class="topbar-spacer"></div>
+    <div class="history-tools" title="Откат и повтор изменений">
+      <button id="undo-btn" class="icon-btn" title="Отменить (Ctrl+Z)" disabled>↶</button>
+      <button id="redo-btn" class="icon-btn" title="Повторить (Ctrl+Y)" disabled>↷</button>
+    </div>
+    <span id="save-status" class="save-status">Сохранено</span>
+    <button id="project-btn" class="btn btn-ghost btn-sm" title="Проект: сохранить, скачать, загрузить">
+      ☰ Проект
+    </button>
+    <button id="refresh-schema-btn" class="btn btn-ghost btn-sm" title="Заново прочитать таблицы из базы">
+      ↻ Таблицы
+    </button>
+    <button id="app-download-btn" class="btn btn-ghost btn-sm" title="Скачать готовое приложение (ZIP) для запуска на любом компьютере">
+      ⇩ Приложение
+    </button>
+    <button id="preview-btn" class="btn btn-primary btn-sm">▶ Предпросмотр</button>
+    <button id="disconnect-btn" class="btn btn-ghost btn-sm">Отключиться</button>
+  </header>
+
+  <nav class="main-tabs" id="main-tabs">
+    <button type="button" class="main-tab active" data-tab="builder">Конструктор</button>
+    <button type="button" class="main-tab" data-tab="auth">Авторизация</button>
+    <button type="button" class="main-tab" data-tab="routines">Функции и триггеры</button>
+  </nav>
+
+  <!-- ---------- Экран конструктора ---------- -->
+  <div id="builder-screen" class="screen">
+    <div id="form-tabs" class="form-tabs"></div>
+
+    <div class="workspace">
+      <!-- Левая панель -->
+      <aside class="panel palette">
+        <div class="panel-head">
+          <h2>Элементы</h2>
+        </div>
+
+        <div class="palette-items">
+          <div class="palette-item" draggable="true" data-drag="element" data-type="text">
+            <span class="pi-icon">T</span>
+            <span class="pi-text"><b>Текст</b><small>Заголовок или подпись</small></span>
+          </div>
+          <div class="palette-item" draggable="true" data-drag="element" data-type="button">
+            <span class="pi-icon">▭</span>
+            <span class="pi-text"><b>Кнопка</b><small>Действия и переходы</small></span>
+          </div>
+          <div class="palette-item" draggable="true" data-drag="element" data-type="input">
+            <span class="pi-icon">⌨</span>
+            <span class="pi-text"><b>Поле ввода</b><small>Привязка к колонке</small></span>
+          </div>
+          <div class="palette-item" draggable="true" data-drag="element" data-type="select">
+            <span class="pi-icon">▾</span>
+            <span class="pi-text"><b>Выпадающий список</b><small>Выбор из связанной таблицы</small></span>
+          </div>
+          <div class="palette-item" draggable="true" data-drag="element" data-type="image">
+            <span class="pi-icon">🖼</span>
+            <span class="pi-text"><b>Изображение</b><small>Картинка или логотип</small></span>
+          </div>
+          <div class="palette-item" draggable="true" data-drag="element" data-type="table">
+            <span class="pi-icon">▦</span>
+            <span class="pi-text"><b>Таблица</b><small>Данные и CRUD</small></span>
+          </div>
+          <div class="palette-item" draggable="true" data-drag="element" data-type="panel">
+            <span class="pi-icon">▥</span>
+            <span class="pi-text"><b>Панель</b><small>Свободный контейнер: размер и вложенность</small></span>
+          </div>
+          <div class="palette-item" draggable="true" data-drag="element" data-type="sql">
+            <span class="pi-icon">⌘</span>
+            <span class="pi-text"><b>SQL-запрос</b><small>SELECT с результатом</small></span>
+          </div>
+        </div>
+
+        <div class="resizer resizer-h" data-resizer="palette" role="separator"
+             aria-orientation="horizontal" tabindex="0"
+             title="Потяните, чтобы изменить высоту списка элементов. Двойной клик — сбросить размеры панелей."></div>
+
+        <div class="panel-head tables-head">
+          <h2>Таблицы БД</h2>
+          <button id="refresh-tables-btn" class="icon-btn" title="Обновить список таблиц">↻</button>
+        </div>
+        <div id="table-list" class="table-list"></div>
+
+        <div class="palette-hint">
+          Перетащите элемент внутрь экрана «Форма» или в панель, либо нажмите
+          на элемент, чтобы добавить его в текущую форму. Панель свободно
+          меняет размер и может содержать другие элементы и панели.
+        </div>
+      </aside>
+
+      <div class="resizer resizer-v" data-resizer="left" role="separator"
+           aria-orientation="vertical" tabindex="0"
+           title="Потяните, чтобы изменить ширину левой панели. Двойной клик — сбросить размеры панелей."></div>
+
+      <!-- Холст -->
+      <main class="canvas-wrap">
+        <div class="canvas-toolbar">
+          <div class="crumbs">
+            <span id="form-crumb">Главная</span>
+            <span class="crumb-sep">/</span>
+            <span class="muted" id="form-size-label">холст формы</span>
+          </div>
+          <div class="canvas-tools">
+            <div class="align-toolbar" id="align-toolbar" title="Выравнивание: один элемент выравнивается по краям формы, группа — друг относительно друга">
+              <button type="button" class="align-btn" data-align="left" title="По левому краю: один элемент — к левому краю формы, группа — по левому из выделенных">⇤</button>
+              <button type="button" class="align-btn" data-align="center-h" title="По центру по горизонтали: один элемент — по центру формы, группа — по общему центру">⇔</button>
+              <button type="button" class="align-btn" data-align="right" title="По правому краю: один элемент — к правому краю формы, группа — по правому из выделенных">⇥</button>
+              <span class="align-sep"></span>
+              <button type="button" class="align-btn" data-align="top" title="По верхнему краю: один элемент — к верху формы, группа — по верхнему из выделенных">⇧</button>
+              <button type="button" class="align-btn" data-align="middle-v" title="По центру по вертикали: один элемент — по центру формы, группа — по общему центру">⇕</button>
+              <button type="button" class="align-btn" data-align="bottom" title="По нижнему краю: один элемент — к низу формы, группа — по нижнему из выделенных">⇩</button>
+              <span class="align-sep"></span>
+              <button type="button" class="align-btn" data-align="distribute-h" title="Равномерно распределить по горизонтали (нужно 3+ элемента)">⇹</button>
+              <button type="button" class="align-btn" data-align="distribute-v" title="Равномерно распределить по вертикали (нужно 3+ элемента)">⇳</button>
+              <button type="button" class="align-btn" data-align="grid" title="Привязать координаты к шагу сетки">#</button>
+            </div>
+            <div class="gap-tools" title="Одинаковое расстояние между выделенными элементами: введите число и нажмите кнопку">
+              <span class="gap-label">Отступ</span>
+              <input id="gap-input" class="gap-input" type="number" min="0" max="400" step="1" value="16">
+              <span class="gap-unit">px</span>
+              <button type="button" class="align-btn" id="gap-h-btn" title="Расставить 2+ элемента с равным промежутком по горизонтали">⇹|</button>
+              <button type="button" class="align-btn" id="gap-v-btn" title="Расставить 2+ элемента с равным промежутком по вертикали">⇳|</button>
+            </div>
+            <label class="snap-toggle" title="Магнит: элементы притягиваются к сетке и краям друг друга. Стрелки слева выравнивают элементы, а не двигают их по одному.">
+              <input type="checkbox" id="snap-toggle" checked>
+              <span>Магнит</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="canvas-scroll">
+          <div id="canvas" class="canvas"></div>
+        </div>
+      </main>
+
+      <div class="resizer resizer-v" data-resizer="right" role="separator"
+           aria-orientation="vertical" tabindex="0"
+           title="Потяните, чтобы изменить ширину правой панели. Двойной клик — сбросить размеры панелей."></div>
+
+      <!-- Правая панель -->
+      <aside class="panel inspector">
+        <section class="tree-section">
+          <div class="panel-head">
+            <h2>Формы</h2>
+            <button id="add-form-btn" class="icon-btn" title="Добавить форму">+</button>
+          </div>
+          <div id="forms-tree" class="forms-tree"></div>
+        </section>
+
+        <div class="resizer resizer-h" data-resizer="tree" role="separator"
+             aria-orientation="horizontal" tabindex="0"
+             title="Потяните, чтобы изменить высоту списка форм и свойств. Двойной клик — сбросить размеры панелей."></div>
+
+        <section class="props-section">
+          <div class="panel-head">
+            <h2>Свойства</h2>
+          </div>
+          <div id="properties" class="properties"></div>
+        </section>
+      </aside>
+    </div>
+
+    <!-- ---------- Вкладка «Таблицы и связи» внутри конструктора ---------- -->
+    <div id="db-screen" class="db-screen" hidden>
+      <div class="db-toolbar">
+        <div class="db-toolbar-title">
+          <h2>Таблицы и связи</h2>
+          <p class="muted">
+            Перетаскивайте таблицы мышью, а связь создавайте кнопкой <b>↗</b>
+            у колонки: нажмите её, затем колонку в другой таблице.
+          </p>
+        </div>
+        <div class="screen-actions">
+          <button id="db-new-table-btn" class="btn btn-primary btn-sm">＋ Таблица</button>
+          <button id="db-new-database-btn" class="btn btn-ghost btn-sm" title="Создать новую базу на этом сервере">＋ База данных</button>
+          <button id="db-auto-layout-btn" class="btn btn-ghost btn-sm" title="Разложить таблицы автоматически">▤ Разложить</button>
+          <button id="db-refresh-btn" class="btn btn-ghost btn-sm">↻ Обновить</button>
+        </div>
+      </div>
+
+      <div class="db-layout">
+        <aside class="db-sidebar">
+          <div class="db-current-card">
+            <span class="muted">Текущая база</span>
+            <b id="db-current-name">—</b>
+          </div>
+
+          <div class="panel-head"><h2>Таблицы</h2></div>
+          <div id="db-table-list" class="db-table-list"></div>
+
+          <div class="panel-head">
+            <h2>Связи</h2>
+            <span id="db-relations-count" class="db-count-badge">0</span>
+          </div>
+          <div id="db-relations-list" class="db-relations-list"></div>
+
+          <div class="db-sidebar-hint">
+            Ошибки создания таблиц и связей показываются в диалоге и во всплывающем
+            сообщении. Связь можно удалить крестиком в списке.
+          </div>
+        </aside>
+
+        <main class="db-diagram-wrap">
+          <div id="db-link-hint" class="db-link-hint" hidden>
+            Выберите колонку в другой таблице, чтобы создать связь.
+            <button type="button" id="db-link-cancel" class="btn btn-ghost btn-sm">Отмена</button>
+          </div>
+          <div id="db-diagram" class="db-diagram"></div>
+        </main>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---------- Экран авторизации ---------- -->
+  <div id="auth-screen" class="screen auth-screen" hidden>
+    <div class="screen-toolbar">
+      <div>
+        <h2>Авторизация приложения</h2>
+        <p class="muted">
+          Вход в предпросмотр по логину и паролю из таблицы вашей базы.
+          Настройка выполняется без программирования.
+        </p>
+      </div>
+    </div>
+
+    <div class="auth-layout">
+      <section class="auth-card">
+        <h3>Вход в предпросмотр</h3>
+
+        <label class="switch-row">
+          <input type="checkbox" data-auth-prop="enabled">
+          <span>Требовать вход перед открытием интерфейса</span>
+        </label>
+        <label class="switch-row">
+          <input type="checkbox" data-auth-prop="allow_registration">
+          <span>Разрешить регистрацию новых пользователей</span>
+        </label>
+
+        <div class="auth-grid">
+          <label class="prop-field full"><span>Заголовок экрана входа</span>
+            <input data-auth-prop="title" value="">
+          </label>
+          <label class="prop-field full"><span>Таблица пользователей</span>
+            <select data-auth-prop="table"></select>
+          </label>
+          <label class="prop-field"><span>Колонка логина</span>
+            <select data-auth-prop="login_column"></select>
+          </label>
+          <label class="prop-field"><span>Колонка пароля</span>
+            <select data-auth-prop="password_column"></select>
+          </label>
+          <label class="prop-field"><span>Колонка роли (необязательно)</span>
+            <select data-auth-prop="role_column"></select>
+          </label>
+          <label class="prop-field"><span>Пароль хранится как</span>
+            <select data-auth-prop="password_mode">
+              <option value="plain">Обычный текст</option>
+              <option value="sha256">Хеш SHA-256</option>
+            </select>
+          </label>
+          <label class="prop-field full"><span>Приветствие после входа (необязательно)</span>
+            <input data-auth-prop="welcome" value="">
+          </label>
+        </div>
+
+        <div class="prop-hint">
+          Логин и пароль проверяются запросом к выбранной таблице. Пароли
+          пользователей приложения не связаны с паролем PostgreSQL.
+        </div>
+      </section>
+
+      <section class="auth-card">
+        <h3>Пользователи</h3>
+        <p class="muted">
+          Быстрый старт: создайте таблицу пользователей с администратором.
+          Дальше можно добавлять пользователей здесь же.
+        </p>
+        <div class="auth-actions">
+          <button id="auth-setup-btn" class="btn btn-primary btn-sm">Создать таблицу пользователей</button>
+          <button id="auth-refresh-users-btn" class="btn btn-ghost btn-sm">↻ Обновить</button>
+        </div>
+
+        <div id="auth-users" class="auth-users"></div>
+
+        <form id="auth-add-user-form" class="auth-add-user" hidden>
+          <h4>Новый пользователь</h4>
+          <div class="auth-grid">
+            <label class="prop-field"><span>Логин</span><input name="login" required></label>
+            <label class="prop-field"><span>Пароль</span><input name="password" type="password" required></label>
+            <label class="prop-field full"><span>Роль</span><input name="role" value="user"></label>
+          </div>
+          <div id="auth-user-error" class="error-box" hidden></div>
+          <button type="submit" class="btn btn-primary btn-sm">Добавить пользователя</button>
+        </form>
+      </section>
+    </div>
+  </div>
+
+  <!-- ---------- Экран «Функции, процедуры и триггеры» ---------- -->
+  <div id="routines-screen" class="screen routines-screen" hidden>
+    <div class="screen-toolbar">
+      <div>
+        <h2>Функции, процедуры и триггеры</h2>
+        <p class="muted">
+          Создавайте функции, хранимые процедуры и триггеры в текущей базе.
+          Выберите шаблон или напишите SQL вручную: за один раз выполняется
+          один оператор <b>CREATE FUNCTION</b>, <b>CREATE PROCEDURE</b> или
+          <b>CREATE TRIGGER</b> (допускается <b>OR REPLACE</b>).
+        </p>
+      </div>
+      <div class="screen-actions">
+        <button id="routines-refresh-btn" class="btn btn-ghost btn-sm">↻ Обновить</button>
+      </div>
+    </div>
+
+    <div class="routines-layout">
+      <aside class="routines-sidebar">
+        <div class="panel-head">
+          <h2>Функции</h2>
+          <span id="routines-functions-count" class="db-count-badge">0</span>
+        </div>
+        <div id="routines-function-list" class="routines-list"></div>
+
+        <div class="panel-head">
+          <h2>Процедуры</h2>
+          <span id="routines-procedures-count" class="db-count-badge">0</span>
+        </div>
+        <div id="routines-procedure-list" class="routines-list"></div>
+
+        <div class="panel-head">
+          <h2>Триггеры</h2>
+          <span id="routines-triggers-count" class="db-count-badge">0</span>
+        </div>
+        <div id="routines-trigger-list" class="routines-list"></div>
+
+        <div class="routines-sidebar-hint">
+          Нажмите на объект, чтобы загрузить его определение в редактор.
+          Удаление доступно кнопкой «Удалить» после выбора объекта.
+        </div>
+      </aside>
+
+      <main class="routines-editor">
+        <div class="routines-editor-head">
+          <div class="routines-templates" id="routines-templates">
+            <span class="muted routines-templates-label">Шаблоны:</span>
+            <button type="button" class="btn btn-ghost btn-sm" data-routine-template="function">Функция</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-routine-template="procedure">Процедура</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-routine-template="trigger">Триггер</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-routine-template="trigger_function">Триггерная функция</button>
+          </div>
+          <div class="routines-editor-actions">
+            <button id="routines-drop-btn" class="btn btn-danger btn-sm" disabled>Удалить</button>
+            <button id="routines-execute-btn" class="btn btn-primary btn-sm">Выполнить</button>
+          </div>
+        </div>
+
+        <div id="routines-selected" class="routines-selected" hidden></div>
+        <div id="routines-error" class="error-box" hidden></div>
+        <textarea id="routines-sql" class="routines-sql" spellcheck="false"
+                  autocomplete="off" placeholder="CREATE OR REPLACE FUNCTION ..."></textarea>
+        <div class="routines-hint">
+          Код выполняется сразу в текущей базе. Доступен один оператор за раз;
+          тела функций в <code>$$ ... $$</code> поддерживаются. Перед удалением
+          функции убедитесь, что она не используется триггером.
+        </div>
+      </main>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== ПРЕДПРОСМОТР ===================== -->
+<section id="preview" class="preview-app" hidden>
+  <header class="preview-topbar">
+    <div class="brand">DB2UI <span>Studio</span></div>
+    <span id="preview-form-name" class="preview-form-name"></span>
+    <div class="topbar-spacer"></div>
+    <span id="preview-user" class="preview-user" hidden></span>
+    <button id="preview-logout-btn" class="btn btn-ghost btn-sm" hidden>Выйти</button>
+    <button id="preview-home-btn" class="btn btn-ghost btn-sm">⌂ На главную</button>
+    <button id="preview-export-btn" class="btn btn-ghost btn-sm" title="Скачать автономный HTML-файл">⇩ HTML</button>
+    <button id="preview-app-btn" class="btn btn-ghost btn-sm" title="Скачать готовое приложение (ZIP) для запуска на любом компьютере">⇩ Приложение</button>
+    <button id="exit-preview-btn" class="btn btn-primary btn-sm">← В редактор</button>
+  </header>
+
+  <div class="preview-stage">
+    <div id="preview-window" class="preview-window">
+      <div class="preview-window-bar">
+        <span class="window-dot"></span>
+        <span id="preview-window-title">Форма</span>
+        <span id="preview-window-size" class="muted"></span>
+      </div>
+      <div id="preview-canvas" class="canvas preview-canvas"></div>
+    </div>
+
+    <div id="preview-login" class="preview-login" hidden>
+      <form id="preview-login-form" class="login-card" autocomplete="off">
+        <div class="brand brand-lg">DB2UI <span>Studio</span></div>
+        <h2 id="preview-login-title">Вход в приложение</h2>
+        <p class="muted">Введите логин и пароль пользователя приложения.</p>
+        <label class="field">
+          <span>Логин</span>
+          <input name="login" required autocomplete="username">
+        </label>
+        <label class="field">
+          <span>Пароль</span>
+          <input name="password" type="password" required autocomplete="current-password">
+        </label>
+        <div id="preview-login-error" class="error-box" hidden></div>
+        <button type="submit" class="btn btn-primary btn-block" id="preview-login-btn">Войти</button>
+        <button type="button" id="preview-show-register" class="btn btn-ghost btn-block" hidden>Создать аккаунт</button>
+        <button type="button" id="preview-login-back" class="btn btn-ghost btn-block">← В редактор</button>
+      </form>
+
+      <form id="preview-register-form" class="login-card" autocomplete="off" hidden>
+        <div class="brand brand-lg">DB2UI <span>Studio</span></div>
+        <h2 id="preview-register-title">Регистрация</h2>
+        <p class="muted">
+          Создайте учётную запись приложения. Логин и пароль сохраняются
+          в таблице пользователей вашей базы.
+        </p>
+        <label class="field">
+          <span>Логин</span>
+          <input name="login" required autocomplete="username" minlength="3" maxlength="64"
+                 placeholder="Например, ivan.petrov">
+        </label>
+        <label class="field">
+          <span>Пароль</span>
+          <input name="password" type="password" required minlength="4" autocomplete="new-password"
+                 placeholder="Не менее 4 символов">
+        </label>
+        <label class="field">
+          <span>Повторите пароль</span>
+          <input name="password2" type="password" required minlength="4" autocomplete="new-password"
+                 placeholder="Ещё раз тот же пароль">
+        </label>
+        <div id="preview-register-error" class="error-box" hidden></div>
+        <button type="submit" class="btn btn-primary btn-block" id="preview-register-btn">Зарегистрироваться</button>
+        <button type="button" id="preview-show-login" class="btn btn-ghost btn-block">← Уже есть аккаунт</button>
+        <button type="button" id="preview-register-back" class="btn btn-ghost btn-block">← В редактор</button>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== ДИАЛОГ ЗАПИСИ ===================== -->
+<dialog id="record-dialog" class="record-dialog">
+  <form id="record-form">
+    <header class="dialog-head">
+      <h2 id="dialog-title">Запись</h2>
+      <button type="button" id="dialog-close" class="icon-btn" aria-label="Закрыть">×</button>
+    </header>
+    <div id="dialog-fields" class="dialog-fields"></div>
+    <div id="dialog-error" class="error-box" hidden></div>
+    <footer class="dialog-foot">
+      <button type="button" id="dialog-cancel" class="btn btn-ghost">Отмена</button>
+      <button type="submit" id="dialog-save" class="btn btn-primary">Сохранить</button>
+    </footer>
+  </form>
+</dialog>
+
+<!-- ===================== ПРОЕКТ ===================== -->
+<dialog id="project-dialog" class="record-dialog app-dialog">
+  <form id="project-form" method="dialog">
+    <header class="dialog-head">
+      <h2>Проект</h2>
+      <button type="button" class="icon-btn dialog-close-btn" aria-label="Закрыть">×</button>
+    </header>
+    <div class="dialog-body">
+      <label class="field">
+        <span>Название проекта</span>
+        <input id="project-name" maxlength="120">
+      </label>
+
+      <div class="dialog-section">
+        <h4>Сетка и выравнивание</h4>
+        <div class="dialog-inline">
+          <label class="field">
+            <span>Шаг сетки, px</span>
+            <input id="project-grid" type="number" min="2" max="64" step="2">
+          </label>
+          <label class="prop-check"><input type="checkbox" id="project-snap"><span>Примагничивание</span></label>
+          <label class="prop-check"><input type="checkbox" id="project-show-grid"><span>Показывать сетку</span></label>
+        </div>
+      </div>
+
+      <div class="dialog-section">
+        <h4>Файл проекта</h4>
+        <p class="muted">
+          Проект автоматически сохраняется на сервере. Файл можно скачать,
+          чтобы вернуться к нему позже, или загрузить на другом компьютере.
+        </p>
+        <div class="dialog-actions">
+          <button type="button" id="project-download-btn" class="btn btn-ghost btn-sm">⇩ Скачать файл</button>
+          <button type="button" id="project-export-app-btn" class="btn btn-primary btn-sm" title="Готовое приложение: локальный сервер, интерфейс и живые данные PostgreSQL">⇩ Приложение (ZIP)</button>
+          <button type="button" id="project-export-html-btn" class="btn btn-ghost btn-sm" title="Автономный HTML со встроенными данными">⇩ HTML-предпросмотр</button>
+          <button type="button" id="project-import-btn" class="btn btn-ghost btn-sm">⇧ Загрузить файл</button>
+          <button type="button" id="project-save-as-btn" class="btn btn-ghost btn-sm">Сохранить как…</button>
+          <button type="button" id="project-new-btn" class="btn btn-danger btn-sm">Новый проект</button>
+        </div>
+        <input id="project-file-input" type="file" accept=".json,.db2ui,application/json" hidden>
+      </div>
+
+      <div class="dialog-section">
+        <h4>Библиотека проектов</h4>
+        <div id="project-library" class="project-library">
+          <div class="empty-small">Загрузка…</div>
+        </div>
+      </div>
+
+      <div id="project-error" class="error-box" hidden></div>
+    </div>
+    <footer class="dialog-foot">
+      <button type="button" class="btn btn-ghost dialog-close-btn">Закрыть</button>
+    </footer>
+  </form>
+</dialog>
+
+<!-- ===================== НОВАЯ ТАБЛИЦА ===================== -->
+<dialog id="db-table-dialog" class="record-dialog app-dialog wide-dialog">
+  <form id="db-table-form">
+    <header class="dialog-head">
+      <h2>Новая таблица</h2>
+      <button type="button" class="icon-btn dialog-close-btn" aria-label="Закрыть">×</button>
+    </header>
+    <div class="dialog-body">
+      <div class="dialog-inline">
+        <label class="field"><span>Имя таблицы</span><input id="db-table-name" placeholder="students" required></label>
+      </div>
+
+      <div class="dialog-section">
+        <h4>Колонки</h4>
+        <div id="db-columns" class="db-columns"></div>
+        <button type="button" id="db-add-column-row" class="btn btn-ghost btn-sm">＋ Колонка</button>
+      </div>
+
+      <div id="db-table-error" class="error-box" hidden></div>
+    </div>
+    <footer class="dialog-foot">
+      <button type="button" class="btn btn-ghost dialog-close-btn">Отмена</button>
+      <button type="submit" class="btn btn-primary">Создать таблицу</button>
+    </footer>
+  </form>
+</dialog>
+
+<!-- ===================== НОВАЯ КОЛОНКА ===================== -->
+<dialog id="db-column-dialog" class="record-dialog app-dialog">
+  <form id="db-column-form">
+    <header class="dialog-head">
+      <h2 id="db-column-title">Новая колонка</h2>
+      <button type="button" class="icon-btn dialog-close-btn" aria-label="Закрыть">×</button>
+    </header>
+    <div class="dialog-body">
+      <div class="auth-grid">
+        <label class="field"><span>Имя колонки</span><input id="db-column-name" required></label>
+        <label class="field"><span>Тип</span><select id="db-column-type"></select></label>
+        <label class="field"><span>Значение по умолчанию</span><select id="db-column-default"></select></label>
+      </div>
+      <label class="prop-check"><input type="checkbox" id="db-column-notnull"><span>Обязательное (NOT NULL)</span></label>
+      <label class="prop-check"><input type="checkbox" id="db-column-unique"><span>Уникальное</span></label>
+      <div id="db-column-error" class="error-box" hidden></div>
+    </div>
+    <footer class="dialog-foot">
+      <button type="button" class="btn btn-ghost dialog-close-btn">Отмена</button>
+      <button type="submit" class="btn btn-primary">Добавить</button>
+    </footer>
+  </form>
+</dialog>
+
+<!-- ===================== НОВАЯ СВЯЗЬ ===================== -->
+<dialog id="db-relation-dialog" class="record-dialog app-dialog">
+  <form id="db-relation-form">
+    <header class="dialog-head">
+      <h2 id="db-relation-title">Новая связь</h2>
+      <button type="button" class="icon-btn dialog-close-btn" aria-label="Закрыть">×</button>
+    </header>
+    <div class="dialog-body">
+      <p class="muted">Колонка этой таблицы будет ссылаться на колонку другой таблицы.</p>
+      <div class="auth-grid">
+        <label class="field"><span>Колонка этой таблицы</span><select id="db-relation-column"></select></label>
+        <label class="field"><span>Таблица-цель</span><select id="db-relation-table"></select></label>
+        <label class="field"><span>Колонка-цель</span><select id="db-relation-ref-column"></select></label>
+        <label class="field"><span>При удалении</span>
+          <select id="db-relation-on-delete">
+            <option value="NO ACTION">Запретить</option>
+            <option value="CASCADE">Удалить связанные</option>
+            <option value="SET NULL">Обнулить</option>
+            <option value="RESTRICT">Строго запретить</option>
+          </select>
+        </label>
+      </div>
+      <div id="db-relation-error" class="error-box" hidden></div>
+    </div>
+    <footer class="dialog-foot">
+      <button type="button" class="btn btn-ghost dialog-close-btn">Отмена</button>
+      <button type="submit" class="btn btn-primary">Создать связь</button>
+    </footer>
+  </form>
+</dialog>
+
+<!-- ===================== НОВАЯ БАЗА ===================== -->
+<dialog id="db-database-dialog" class="record-dialog app-dialog">
+  <form id="db-database-form">
+    <header class="dialog-head">
+      <h2>Новая база данных</h2>
+      <button type="button" class="icon-btn dialog-close-btn" aria-label="Закрыть">×</button>
+    </header>
+    <div class="dialog-body">
+      <p class="muted">
+        База будет создана на том же сервере PostgreSQL от имени текущего
+        пользователя. После создания её можно открыть здесь же.
+      </p>
+      <label class="field">
+        <span>Имя базы данных</span>
+        <input id="db-database-name" placeholder="my_app" required>
+      </label>
+      <div id="db-database-error" class="error-box" hidden></div>
+    </div>
+    <footer class="dialog-foot">
+      <button type="button" class="btn btn-ghost dialog-close-btn">Отмена</button>
+      <button type="submit" class="btn btn-primary">Создать базу</button>
+    </footer>
+  </form>
+</dialog>
+
+<!-- ===================== ТАБЛИЦА ПОЛЬЗОВАТЕЛЕЙ ===================== -->
+<dialog id="auth-setup-dialog" class="record-dialog app-dialog">
+  <form id="auth-setup-form">
+    <header class="dialog-head">
+      <h2>Создать таблицу пользователей</h2>
+      <button type="button" class="icon-btn dialog-close-btn" aria-label="Закрыть">×</button>
+    </header>
+    <div class="dialog-body">
+      <p class="muted">
+        Будет создана таблица с колонками логина, пароля и роли.
+        Пароль администратора сохраняется в выбранном виде.
+      </p>
+      <div class="auth-grid">
+        <label class="field"><span>Имя таблицы</span><input id="auth-setup-table" value="app_users"></label>
+        <label class="field"><span>Колонка логина</span><input id="auth-setup-login" value="login"></label>
+        <label class="field"><span>Колонка пароля</span><input id="auth-setup-password" value="password"></label>
+        <label class="field"><span>Колонка роли</span><input id="auth-setup-role" value="role"></label>
+        <label class="field"><span>Хранение пароля</span>
+          <select id="auth-setup-mode">
+            <option value="sha256">Хеш SHA-256 (рекомендуется)</option>
+            <option value="plain">Обычный текст</option>
+          </select>
+        </label>
+        <label class="field"><span>Логин администратора</span><input id="auth-setup-admin-login" value="admin"></label>
+        <label class="field"><span>Пароль администратора</span><input id="auth-setup-admin-password" type="password" required></label>
+      </div>
+      <div id="auth-setup-error" class="error-box" hidden></div>
+    </div>
+    <footer class="dialog-foot">
+      <button type="button" class="btn btn-ghost dialog-close-btn">Отмена</button>
+      <button type="submit" class="btn btn-primary">Создать</button>
+    </footer>
+  </form>
+</dialog>
+
+<script src="{{ url_for('static', filename='app.js') }}" defer></script>
+</body>
+</html>

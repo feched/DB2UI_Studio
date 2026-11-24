@@ -1,0 +1,45 @@
+VSVersionInfo(
+  ffi=FixedFileInfo(
+    filevers=(1, 0, 0, 0),
+    prodvers=(1, 0, 0, 0),
+    mask=0x3f,
+    flags=0x0,
+    OS=0x40004,
+    fileType=0x1,
+    subtype=0x0,
+    date=(0, 0)
+  ),
+  kids=[
+    StringFileInfo(
+      [
+        StringTable(
+          '040904B0',
+          [
+            StringStruct('CompanyName', 'DB2UI'),
+            StringStruct('FileDescription', 'DB2UI Studio — конструктор приложений для PostgreSQL'),
+            StringStruct('FileVersion', '1.0.0.0'),
+            StringStruct('InternalName', 'DB2UI Studio'),
+            StringStruct('LegalCopyright', 'DB2UI Studio'),
+            StringStruct('OriginalFilename', 'DB2UI Studio.exe'),
+            StringStruct('ProductName', 'DB2UI Studio'),
+            StringStruct('ProductVersion', '1.0.0.0')
+          ]
+        ),
+        StringTable(
+          '041904B0',
+          [
+            StringStruct('CompanyName', 'DB2UI'),
+            StringStruct('FileDescription', 'DB2UI Studio — конструктор приложений для PostgreSQL'),
+            StringStruct('FileVersion', '1.0.0.0'),
+            StringStruct('InternalName', 'DB2UI Studio'),
+            StringStruct('LegalCopyright', 'DB2UI Studio'),
+            StringStruct('OriginalFilename', 'DB2UI Studio.exe'),
+            StringStruct('ProductName', 'DB2UI Studio'),
+            StringStruct('ProductVersion', '1.0.0.0')
+          ]
+        )
+      ]
+    ),
+    VarFileInfo([VarStruct('Translation', [1033, 1200, 1049, 1200])])
+  ]
+)
