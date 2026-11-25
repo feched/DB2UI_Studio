@@ -22,6 +22,8 @@
         новый интерфейс для своей базы PostgreSQL.
       </p>
 
+      <div id="connect-status" class="connect-status" hidden></div>
+
       <div id="connect-library" class="connect-library">
         <div class="empty-small">Загрузка…</div>
       </div>
@@ -30,8 +32,9 @@
         ＋ Новый проект
       </button>
       <p class="hint">
-        Для открытия проекта понадобится пароль PostgreSQL — он не сохраняется
-        в файлах проекта.
+        Проект с сохранённым паролем открывается сразу. Если пароль ещё не
+        сохранён, введите его один раз — дальше приложение запомнит его
+        в зашифрованном виде.
       </p>
     </div>
 
@@ -42,6 +45,11 @@
         </button>
         <span id="connect-project-label" class="connect-project-label" hidden></span>
       </div>
+
+      <label class="field field-project-name" id="connect-project-name-field" hidden>
+        <span>Название проекта</span>
+        <input name="project_name" maxlength="120" placeholder="По умолчанию — имя базы данных">
+      </label>
 
       <div class="connect-grid">
         <label class="field">

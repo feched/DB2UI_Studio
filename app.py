@@ -670,6 +670,191 @@ def project_summary(path: Path) -> dict[str, Any] | None:
     }
 
 
+# ---- Сохранённые пароли подключений ----------------------------------------
+#
+# Пароль шифруется Windows DPAPI и привязан к текущей учётной записи Windows.
+# В проектах и в открытом виде пароль не хранится.
+
+CREDENTIALS_FILE = DATA_DIR / "credentials.json"
+CREDENTIALS_LOCK = threading.RLock()
+
+
+def _credential_key(host: str, port: int, dbname: str, user: str) -> str:
+    return "|".join(
+        (
+            str(host or "").strip().lower(),
+            str(port or 5432),
+            str(dbname or ""),
+            str(user or ""),
+        )
+    )
+
+
+def _dpapi_protect(value: str) -> str | None:
+    """Зашифровать строку для текущего пользователя Windows."""
+    if os.name != "nt" or not value:
+        return None
+    try:
+        import base64
+        import ctypes
+        from ctypes import wintypes
+
+        class DataBlob(ctypes.Structure):
+            _fields_ = [
+                ("cbData", wintypes.DWORD),
+                ("pbData", ctypes.POINTER(ctypes.c_char)),
+            ]
+
+        raw = value.encode("utf-8")
+        buffer = ctypes.create_string_buffer(raw)
+        blob_in = DataBlob(len(raw), ctypes.cast(buffer, ctypes.POINTER(ctypes.c_char)))
+        blob_out = DataBlob()
+        crypt32 = ctypes.windll.crypt32
+        crypt32.CryptProtectData.restype = wintypes.BOOL
+        if not crypt32.CryptProtectData(
+            ctypes.byref(blob_in),
+            None,
+            None,
+            None,
+            None,
+            0,
+            ctypes.byref(blob_out),
+        ):
+            return None
+        try:
+            token = ctypes.string_at(blob_out.pbData, blob_out.cbData)
+        finally:
+            ctypes.windll.kernel32.LocalFree(blob_out.pbData)
+        return base64.b64encode(token).decode("ascii")
+    except Exception:
+        return None
+
+
+def _dpapi_unprotect(token: str) -> str | None:
+    """Расшифровать строку, созданную _dpapi_protect."""
+    if os.name != "nt" or not token:
+        return None
+    try:
+        import base64
+        import ctypes
+        from ctypes import wintypes
+
+        class DataBlob(ctypes.Structure):
+            _fields_ = [
+                ("cbData", wintypes.DWORD),
+                ("pbData", ctypes.POINTER(ctypes.c_char)),
+            ]
+
+        raw = base64.b64decode(token)
+        buffer = ctypes.create_string_buffer(raw)
+        blob_in = DataBlob(len(raw), ctypes.cast(buffer, ctypes.POINTER(ctypes.c_char)))
+        blob_out = DataBlob()
+        crypt32 = ctypes.windll.crypt32
+        crypt32.CryptUnprotectData.restype = wintypes.BOOL
+        if not crypt32.CryptUnprotectData(
+            ctypes.byref(blob_in),
+            None,
+            None,
+            None,
+            None,
+            0,
+            ctypes.byref(blob_out),
+        ):
+            return None
+        try:
+            value = ctypes.string_at(blob_out.pbData, blob_out.cbData)
+        finally:
+            ctypes.windll.kernel32.LocalFree(blob_out.pbData)
+        return value.decode("utf-8", "replace")
+    except Exception:
+        return None
+
+
+def _load_credentials() -> dict[str, dict[str, Any]]:
+    try:
+        data = json.loads(CREDENTIALS_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    connections = data.get("connections") if isinstance(data, dict) else None
+    return connections if isinstance(connections, dict) else {}
+
+
+def _write_credentials(connections: dict[str, dict[str, Any]]) -> None:
+    payload = json.dumps(
+        {"version": 1, "connections": connections},
+        ensure_ascii=False,
+        indent=2,
+    )
+    tmp = CREDENTIALS_FILE.with_suffix(".tmp")
+    tmp.write_text(payload, encoding="utf-8")
+    os.replace(tmp, CREDENTIALS_FILE)
+
+
+def remember_credential(params: dict[str, Any]) -> None:
+    password = str(params.get("password") or "")
+    if not password:
+        return
+    token = _dpapi_protect(password)
+    if not token:
+        return
+    host = _text(params.get("host"), 200)
+    port = _clamp_int(params.get("port"), 5432, 1, 65535)
+    dbname = _text(params.get("dbname"), 120)
+    user = _text(params.get("user"), 120)
+    key = _credential_key(host, port, dbname, user)
+    entry = {
+        "host": host,
+        "port": port,
+        "dbname": dbname,
+        "user": user,
+        "password": token,
+        "updated": datetime.now(tz=timezone.utc).isoformat(),
+    }
+    with CREDENTIALS_LOCK:
+        connections = _load_credentials()
+        connections[key] = entry
+        try:
+            _write_credentials(connections)
+        except OSError:
+            pass
+
+
+def recall_credential(
+    host: str,
+    port: int,
+    dbname: str,
+    user: str = "",
+) -> dict[str, str] | None:
+    host = str(host or "").strip()
+    dbname = str(dbname or "").strip()
+    user = str(user or "").strip()
+    if not host or not dbname:
+        return None
+    with CREDENTIALS_LOCK:
+        connections = _load_credentials()
+    entry: dict[str, Any] | None = None
+    if user:
+        entry = connections.get(_credential_key(host, port, dbname, user))
+    else:
+        matches = [
+            item
+            for item in connections.values()
+            if isinstance(item, dict)
+            and str(item.get("host") or "").lower() == host.lower()
+            and _clamp_int(item.get("port"), 5432, 1, 65535) == port
+            and str(item.get("dbname") or "") == dbname
+        ]
+        if matches:
+            matches.sort(key=lambda item: str(item.get("updated") or ""), reverse=True)
+            entry = matches[0]
+    if not isinstance(entry, dict):
+        return None
+    password = _dpapi_unprotect(str(entry.get("password") or ""))
+    if not password:
+        return None
+    return {"user": _text(entry.get("user"), 120), "password": password}
+
+
 # ---- Описание таблиц для визуального редактора ----------------------------
 
 COLUMN_TYPE_RE = re.compile(
@@ -785,6 +970,66 @@ def index():
     return render_template("index.html", defaults=DEFAULT_DB)
 
 
+def _establish_session(
+    params: dict[str, Any],
+    project_path: Path | None = None,
+) -> dict[str, Any]:
+    """Подключиться к PostgreSQL и открыть проект (или файл проекта)."""
+    try:
+        conn = open_connection(params)
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT current_database(),
+                       current_user,
+                       current_setting('server_version')
+                """
+            )
+            dbname_actual, user_actual, version = cur.fetchone()
+        params["dbname"] = dbname_actual
+        params["user"] = user_actual
+        tables = introspect_tables(conn)
+    except Exception as exc:  # noqa: BLE001 — текст ошибки нужен пользователю
+        try:
+            conn.close()  # type: ignore[possibly-undefined]
+        except Exception:
+            pass
+        raise ApiError(f"Не удалось подключиться: {db_error_text(exc)}")
+
+    sid = session.get("sid") or secrets.token_urlsafe(24)
+    with SESSIONS_LOCK:
+        old_state = SESSIONS.pop(sid, None)
+        if old_state:
+            try:
+                old_state["conn"].close()
+            except Exception:
+                pass
+
+        path = project_path or project_file_path(params)
+        project = load_project_file(path, dbname_actual)
+        project["meta"] = storage_meta(params)
+        try:
+            save_project_file(path, project)
+        except OSError:
+            pass
+        SESSIONS[sid] = {
+            "conn": conn,
+            "lock": threading.RLock(),
+            "params": params,
+            "tables": tables,
+            "project": project,
+            "project_path": path,
+            "dbname": dbname_actual,
+            "user": user_actual,
+            "version": version,
+            "auth_user": None,
+        }
+
+    session["sid"] = sid
+    remember_credential(params)
+    return SESSIONS[sid]
+
+
 @app.post("/api/connect")
 def api_connect():
     data = request.get_json(silent=True) or {}
@@ -811,57 +1056,8 @@ def api_connect():
         "password": password,
     }
 
-    try:
-        conn = open_connection(params)
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT current_database(),
-                       current_user,
-                       current_setting('server_version')
-                """
-            )
-            dbname_actual, user_actual, version = cur.fetchone()
-        params["dbname"] = dbname_actual
-        tables = introspect_tables(conn)
-    except Exception as exc:  # noqa: BLE001 — текст ошибки нужен пользователю
-        try:
-            conn.close()  # type: ignore[possibly-undefined]
-        except Exception:
-            pass
-        raise ApiError(f"Не удалось подключиться: {db_error_text(exc)}")
-
-    sid = session.get("sid") or secrets.token_urlsafe(24)
-    with SESSIONS_LOCK:
-        old_state = SESSIONS.pop(sid, None)
-        if old_state:
-            try:
-                old_state["conn"].close()
-            except Exception:
-                pass
-
-        path = project_file_path(params)
-        project = load_project_file(path, dbname_actual)
-        project["meta"] = storage_meta(params)
-        try:
-            save_project_file(path, project)
-        except OSError:
-            pass
-        SESSIONS[sid] = {
-            "conn": conn,
-            "lock": threading.RLock(),
-            "params": params,
-            "tables": tables,
-            "project": project,
-            "project_path": path,
-            "dbname": dbname_actual,
-            "user": user_actual,
-            "version": version,
-            "auth_user": None,
-        }
-
-    session["sid"] = sid
-    return jsonify(session_payload(SESSIONS[sid]))
+    state = _establish_session(params)
+    return jsonify(session_payload(state))
 
 
 @app.get("/api/state")
@@ -1143,6 +1339,73 @@ def api_projects_list():
     )
 
 
+@app.post("/api/projects/open-saved")
+def api_projects_open_saved():
+    """Открыть проект с сохранённым паролем без запроса пароля."""
+    data = request.get_json(silent=True) or {}
+    path = project_path_by_name(str(data.get("file") or ""))
+    if not path.exists():
+        raise ApiError("Файл проекта не найден.", 404)
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        raise ApiError("Не удалось прочитать файл проекта.", 400)
+    if not isinstance(raw, dict) or not isinstance(raw.get("forms"), list):
+        raise ApiError("Файл не похож на проект DB2UI.", 400)
+
+    summary = project_summary(path)
+    if not summary:
+        raise ApiError("Не удалось прочитать файл проекта.", 400)
+    host = summary.get("host") or ""
+    port = summary.get("port") or 5432
+    dbname = summary.get("database") or ""
+    user = summary.get("user") or ""
+    if not host or not dbname:
+        raise ApiError(
+            "В проекте не сохранены параметры подключения. Откройте его вручную.",
+            400,
+        )
+
+    saved = recall_credential(host, port, dbname, user)
+    if not saved:
+        return (
+            jsonify(
+                {
+                    "error": (
+                        "Для этого проекта ещё не сохранён пароль. "
+                        "Введите его один раз — дальше проект будет открываться сразу."
+                    ),
+                    "need_password": True,
+                }
+            ),
+            409,
+        )
+
+    params = {
+        "host": host,
+        "port": port,
+        "dbname": dbname,
+        "user": user or saved.get("user") or "",
+        "password": saved.get("password") or "",
+    }
+    if not params["user"]:
+        return (
+            jsonify(
+                {
+                    "error": (
+                        "Для этого проекта не сохранён пользователь PostgreSQL. "
+                        "Введите пароль и пользователя один раз."
+                    ),
+                    "need_password": True,
+                }
+            ),
+            409,
+        )
+
+    state = _establish_session(params, project_path=path)
+    return jsonify(session_payload(state))
+
+
 @app.post("/api/projects/open")
 def api_projects_open():
     state = require_state()
@@ -1233,7 +1496,11 @@ def api_projects_save_as():
 @app.post("/api/projects/new")
 def api_projects_new():
     state = require_state()
+    data = request.get_json(silent=True) or {}
+    name = _text(data.get("name"), 120).strip()
     project = new_project(state["dbname"])
+    if name:
+        project["name"] = name
     project["meta"] = storage_meta(state["params"])
     try:
         save_project_file(state["project_path"], project)

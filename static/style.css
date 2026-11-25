@@ -319,6 +319,28 @@ code {
   overflow-y: auto;
 }
 
+.connect-library.busy {
+  pointer-events: none;
+  opacity: .55;
+}
+
+.connect-status {
+  margin-bottom: 12px;
+  border: 1px solid var(--brand-line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--brand-soft);
+  color: var(--brand-dark);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.field-project-name {
+  margin-bottom: 16px;
+}
+
 .connect-project {
   display: flex;
   width: 100%;
