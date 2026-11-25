@@ -210,6 +210,31 @@ def _readme(
     return "\n".join(lines).encode("utf-8-sig")
 
 
+def build_app_bundle(
+    project: dict[str, Any],
+    tables: list[dict[str, Any]],
+    config: dict[str, Any],
+) -> dict[str, Any]:
+    """Данные приложения: проект, таблицы и шаблон подключения."""
+    connection = _connection_template(config)
+    return {
+        "project": project,
+        "tables": [item for item in tables if isinstance(item, dict)],
+        "exported_by": "DB2UI Studio",
+        "connection": {
+            "host": connection["host"],
+            "port": connection["port"],
+            "dbname": connection["dbname"],
+            "user": connection["user"],
+        },
+    }
+
+
+def connection_template(config: dict[str, Any]) -> dict[str, Any]:
+    """Параметры подключения без пароля (для data/config.json)."""
+    return _connection_template(config)
+
+
 def build_app_zip(
     project: dict[str, Any],
     tables: list[dict[str, Any]],
@@ -224,20 +249,9 @@ def build_app_zip(
 
     project_name = str(project.get("name") or config.get("dbname") or "DB2UI App")
     forms = project.get("forms") if isinstance(project.get("forms"), list) else []
-    normalized_tables = [item for item in tables if isinstance(item, dict)]
-    connection = _connection_template(config)
-
-    bundle = {
-        "project": project,
-        "tables": normalized_tables,
-        "exported_by": "DB2UI Studio",
-        "connection": {
-            "host": connection["host"],
-            "port": connection["port"],
-            "dbname": connection["dbname"],
-            "user": connection["user"],
-        },
-    }
+    bundle = build_app_bundle(project, tables, config)
+    normalized_tables = bundle["tables"]
+    connection = connection_template(config)
 
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:

@@ -12,7 +12,7 @@ param(
     [switch]$SkipInstaller,
     [switch]$SkipDeps,
     [switch]$InstallInno,
-    [string]$Version = "1.2.0"
+    [string]$Version = "1.3.0"
 )
 
 $ErrorActionPreference = "Stop"
@@ -25,18 +25,22 @@ if (-not (Test-Path $python)) {
 }
 
 if (-not $SkipDeps) {
-    Write-Host "[1/4] Проверка зависимостей сборки..." -ForegroundColor Cyan
+    Write-Host "[1/5] Проверка зависимостей сборки..." -ForegroundColor Cyan
     & $python -m pip install --disable-pip-version-check -r requirements-build.txt
     if ($LASTEXITCODE -ne 0) { throw "Не удалось установить зависимости." }
 } else {
-    Write-Host "[1/4] Зависимости пропущены (-SkipDeps)." -ForegroundColor DarkGray
+    Write-Host "[1/5] Зависимости пропущены (-SkipDeps)." -ForegroundColor DarkGray
 }
 
-Write-Host "[2/4] Иконка приложения..." -ForegroundColor Cyan
+Write-Host "[2/5] Встроенный проигрыватель для экспорта в .exe..." -ForegroundColor Cyan
+& $python tools\build_player.py
+if ($LASTEXITCODE -ne 0) { throw "Не удалось собрать встроенный проигрыватель." }
+
+Write-Host "[3/5] Иконка приложения..." -ForegroundColor Cyan
 & $python tools\make_icon.py
 if ($LASTEXITCODE -ne 0) { throw "Не удалось создать иконку." }
 
-Write-Host "[3/4] Сборка exe (PyInstaller)..." -ForegroundColor Cyan
+Write-Host "[4/5] Сборка exe (PyInstaller)..." -ForegroundColor Cyan
 & $python -m PyInstaller --noconfirm --clean desktop.spec
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller завершился с ошибкой." }
 
@@ -46,7 +50,7 @@ $sizeMb = [math]::Round((Get-Item $exe).Length / 1MB, 1)
 Write-Host "      Готово: $exe ($sizeMb МБ)" -ForegroundColor Green
 
 if ($SkipInstaller) {
-    Write-Host "[4/4] Установщик пропущен (-SkipInstaller)." -ForegroundColor DarkGray
+    Write-Host "[5/5] Установщик пропущен (-SkipInstaller)." -ForegroundColor DarkGray
     return
 }
 
@@ -77,7 +81,7 @@ if (-not $iscc) {
     return
 }
 
-Write-Host "[4/4] Сборка установщика (Inno Setup)..." -ForegroundColor Cyan
+Write-Host "[5/5] Сборка установщика (Inno Setup)..." -ForegroundColor Cyan
 & $iscc "/DMyAppVersion=$Version" "installer\db2ui.iss"
 if ($LASTEXITCODE -ne 0) { throw "Inno Setup завершился с ошибкой." }
 

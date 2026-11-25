@@ -1317,6 +1317,44 @@ def api_app_export():
     return response
 
 
+@app.get("/api/app/export-exe")
+def api_app_export_exe():
+    """Один .exe: встроенный Python, локальный сервер и проект внутри."""
+    state = require_state()
+    project = state["project"]
+    params = state.get("params") or {}
+
+    from exe_export import app_exe_ascii_filename, app_exe_filename, build_app_exe
+
+    try:
+        payload = build_app_exe(
+            project,
+            state["tables"],
+            {
+                "host": params.get("host") or "",
+                "port": params.get("port") or 5432,
+                "dbname": state.get("dbname") or params.get("dbname") or "",
+                "user": state.get("user") or params.get("user") or "",
+                "sslmode": params.get("sslmode") or "prefer",
+            },
+            BASE_DIR,
+        )
+    except RuntimeError as exc:
+        raise ApiError(str(exc), 500)
+
+    filename = app_exe_filename(project.get("name") or state["dbname"])
+    ascii_name = app_exe_ascii_filename(project.get("name") or state["dbname"])
+    response = Response(payload, mimetype="application/octet-stream")
+    response.headers["Content-Disposition"] = (
+        "attachment; filename=\""
+        + ascii_name
+        + "\"; filename*=UTF-8''"
+        + quote(filename)
+    )
+    response.headers["Content-Length"] = str(len(payload))
+    return response
+
+
 @app.get("/api/projects")
 def api_projects_list():
     """Список сохранённых проектов. Доступен и до подключения к базе."""

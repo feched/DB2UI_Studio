@@ -24,6 +24,10 @@ build/
 dist/
 *.spec.bak
 
+# Встроенный проигрыватель для экспорта в один .exe
+# (собирается tools/build_player.py)
+/assets/player/
+
 # Системный мусор и логи (на всякий случай)
 test_portable_build
 Thumbs.db

@@ -1594,12 +1594,10 @@ function bindBuilderChrome() {
   $('#preview-home-btn').addEventListener('click', goPreviewHome);
   $('#exit-preview-btn').addEventListener('click', exitPreview);
   $('#preview-logout-btn').addEventListener('click', logoutPreview);
-  const exportHtml = $('#preview-export-btn');
-  if (exportHtml) exportHtml.addEventListener('click', downloadStandalonePreview);
-  const previewApp = $('#preview-app-btn');
-  if (previewApp) previewApp.addEventListener('click', downloadPortableApp);
-  const topbarApp = $('#app-download-btn');
-  if (topbarApp) topbarApp.addEventListener('click', downloadPortableApp);
+  const topbarDownload = $('#app-download-btn');
+  if (topbarDownload) topbarDownload.addEventListener('click', downloadAppExe);
+  const previewDownload = $('#preview-download-btn');
+  if (previewDownload) previewDownload.addEventListener('click', downloadAppExe);
 
   $('#undo-btn').addEventListener('click', undoProject);
   $('#redo-btn').addEventListener('click', redoProject);
@@ -7359,10 +7357,8 @@ function bindProjectDialog() {
   });
 
   $('#project-download-btn').addEventListener('click', downloadCurrentProject);
-  const exportHtml = $('#project-export-html-btn');
-  if (exportHtml) exportHtml.addEventListener('click', downloadStandalonePreview);
-  const exportApp = $('#project-export-app-btn');
-  if (exportApp) exportApp.addEventListener('click', downloadPortableApp);
+  const exportExe = $('#project-export-exe-btn');
+  if (exportExe) exportExe.addEventListener('click', downloadAppExe);
   $('#project-import-btn').addEventListener('click', () => $('#project-file-input').click());
   $('#project-file-input').addEventListener('change', importProjectFile);
   $('#project-save-as-btn').addEventListener('click', saveAsProject);
@@ -7443,7 +7439,7 @@ async function loadProjectLibrary() {
   }
 }
 
-async function downloadStandalonePreview() {
+async function downloadAppExe() {
   if (!state.project) {
     toast('Сначала подключитесь к базе и откройте проект.', 'error');
     return;
@@ -7451,52 +7447,22 @@ async function downloadStandalonePreview() {
   try {
     await flushSave();
   } catch (error) {
-    // ошибка сохранения уже показана; экспортируем текущее состояние
+    // ошибка сохранения уже показана; собираем приложение из текущего состояния
   }
-  try {
-    const response = await fetch('/api/preview/export', { credentials: 'same-origin' });
-    if (!response.ok) {
-      let message = 'Не удалось создать HTML-предпросмотр.';
-      try {
-        const data = await response.json();
-        if (data && data.error) message = data.error;
-      } catch (error) {
-        // ответ не JSON
-      }
-      throw new Error(message);
-    }
-    const blob = await response.blob();
-    const safe = String(state.project.name || state.db?.database || 'preview')
-      .replace(/[\\/:*?"<>|]+/g, '_')
-      .slice(0, 60) || 'preview';
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = safe + '.preview.html';
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 4000);
-    toast('Автономный HTML скачан. Откройте его двойным кликом.', 'success');
-  } catch (error) {
-    toast(error.message, 'error');
-  }
-}
 
-async function downloadPortableApp() {
-  if (!state.project) {
-    toast('Сначала подключитесь к базе и откройте проект.', 'error');
-    return;
-  }
+  const buttons = ['#app-download-btn', '#preview-download-btn', '#project-export-exe-btn']
+    .map((selector) => $(selector))
+    .filter(Boolean);
+  const labels = buttons.map((button) => button.textContent);
+  buttons.forEach((button) => {
+    button.disabled = true;
+    button.textContent = 'Сборка…';
+  });
+
   try {
-    await flushSave();
-  } catch (error) {
-    // ошибка сохранения уже показана; соберём архив из текущего состояния
-  }
-  try {
-    const response = await fetch('/api/app/export', { credentials: 'same-origin' });
+    const response = await fetch('/api/app/export-exe', { credentials: 'same-origin' });
     if (!response.ok) {
-      let message = 'Не удалось собрать приложение.';
+      let message = 'Не удалось собрать .exe.';
       try {
         const data = await response.json();
         if (data && data.error) message = data.error;
@@ -7512,17 +7478,22 @@ async function downloadPortableApp() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = safe + '.app.zip';
+    link.download = safe + '.exe';
     document.body.appendChild(link);
     link.click();
     link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 4000);
     toast(
-      'Приложение скачано. Распакуйте архив и запустите run.bat (или run.sh).',
+      'Готово: один .exe. Запустите его двойным кликом — Python и установка не нужны.',
       'success'
     );
   } catch (error) {
     toast(error.message, 'error');
+  } finally {
+    buttons.forEach((button, index) => {
+      button.disabled = false;
+      button.textContent = labels[index];
+    });
   }
 }
 
