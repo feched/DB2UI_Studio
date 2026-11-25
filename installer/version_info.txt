@@ -17,12 +17,12 @@ VSVersionInfo(
           [
             StringStruct('CompanyName', 'DB2UI'),
             StringStruct('FileDescription', 'DB2UI Studio — конструктор приложений для PostgreSQL'),
-            StringStruct('FileVersion', '1.0.0.0'),
+            StringStruct('FileVersion', '1.1.0.0'),
             StringStruct('InternalName', 'DB2UI Studio'),
             StringStruct('LegalCopyright', 'DB2UI Studio'),
             StringStruct('OriginalFilename', 'DB2UI Studio.exe'),
             StringStruct('ProductName', 'DB2UI Studio'),
-            StringStruct('ProductVersion', '1.0.0.0')
+            StringStruct('ProductVersion', '1.1.0.0')
           ]
         ),
         StringTable(
@@ -30,12 +30,12 @@ VSVersionInfo(
           [
             StringStruct('CompanyName', 'DB2UI'),
             StringStruct('FileDescription', 'DB2UI Studio — конструктор приложений для PostgreSQL'),
-            StringStruct('FileVersion', '1.0.0.0'),
+            StringStruct('FileVersion', '1.1.0.0'),
             StringStruct('InternalName', 'DB2UI Studio'),
             StringStruct('LegalCopyright', 'DB2UI Studio'),
             StringStruct('OriginalFilename', 'DB2UI Studio.exe'),
             StringStruct('ProductName', 'DB2UI Studio'),
-            StringStruct('ProductVersion', '1.0.0.0')
+            StringStruct('ProductVersion', '1.1.0.0')
           ]
         )
       ]

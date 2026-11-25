@@ -14,26 +14,35 @@
 <section id="connect-screen" class="connect-screen">
   <div class="connect-card">
     <div class="brand brand-lg">DB2UI <span>Studio</span></div>
-    <h1>Подключите базу данных</h1>
-    <p class="muted">
-      Введите параметры PostgreSQL. После подключения появятся ваши таблицы,
-      из которых можно собирать интерфейс без программирования.
-    </p>
 
     <div id="connect-intro" class="connect-intro">
-      <button type="button" id="connect-start-btn" class="btn btn-primary btn-block">
-        Подключить
-      </button>
-      <button type="button" id="connect-new-btn" class="btn btn-ghost btn-block">
+      <h1>Ваши проекты</h1>
+      <p class="muted">
+        Выберите сохранённый проект, чтобы продолжить работу, или создайте
+        новый интерфейс для своей базы PostgreSQL.
+      </p>
+
+      <div id="connect-library" class="connect-library">
+        <div class="empty-small">Загрузка…</div>
+      </div>
+
+      <button type="button" id="connect-new-btn" class="btn btn-primary btn-block">
         ＋ Новый проект
       </button>
       <p class="hint">
-        «Подключить» откроет последний проект этой базы, «Новый проект» —
-        создаст пустой интерфейс после подключения.
+        Для открытия проекта понадобится пароль PostgreSQL — он не сохраняется
+        в файлах проекта.
       </p>
     </div>
 
     <form id="connect-form" autocomplete="off" hidden>
+      <div class="connect-form-head">
+        <button type="button" id="connect-back-btn" class="link-btn">
+          ← Ко всем проектам
+        </button>
+        <span id="connect-project-label" class="connect-project-label" hidden></span>
+      </div>
+
       <div class="connect-grid">
         <label class="field">
           <span>Сервер</span>
@@ -73,7 +82,7 @@
       в файлы проекта. Настройки по умолчанию можно изменить в файле <code>.env</code>.
     </p>
   </div>
-  <div class="connect-footer">DB2UI Studio · учебный no-code конструктор</div>
+  <div class="connect-footer">DB2UI Studio · no-code конструктор для PostgreSQL</div>
 </section>
 
 <!-- ===================== РЕДАКТОР ===================== -->

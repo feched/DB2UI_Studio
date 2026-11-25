@@ -309,6 +309,113 @@ code {
   text-align: center;
 }
 
+.connect-library {
+  display: flex;
+  max-height: 320px;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 4px;
+  padding-right: 4px;
+  overflow-y: auto;
+}
+
+.connect-project {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #fff;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color .15s, box-shadow .15s, transform .15s;
+}
+
+.connect-project:hover {
+  border-color: var(--brand-line);
+  box-shadow: 0 10px 24px rgba(79, 70, 229, .12);
+  transform: translateY(-1px);
+}
+
+.connect-project:focus-visible {
+  outline: 2px solid #818cf8;
+  outline-offset: 2px;
+}
+
+.connect-project-main {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.connect-project-main b {
+  overflow: hidden;
+  font-size: 14px;
+  letter-spacing: -.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.connect-project-main small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.connect-project-main .connect-project-meta {
+  color: var(--muted-2);
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 10px;
+}
+
+.connect-project-open {
+  flex: 0 0 auto;
+  color: var(--brand);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.connect-form-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.link-btn {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--brand);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.link-btn:hover {
+  color: var(--brand-dark);
+  text-decoration: underline;
+}
+
+.connect-project-label {
+  overflow: hidden;
+  max-width: 55%;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .field {
   display: flex;
   flex-direction: column;

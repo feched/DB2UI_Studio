@@ -182,6 +182,8 @@ const state = {
   toastTimer: null,
   mainTab: 'builder',
   newProjectOnConnect: false,
+  pendingProjectFile: null,
+  connectDefaults: null,
   dbColumnContext: null,
   dbRelationContext: null,
   dbLink: null,
@@ -1102,6 +1104,7 @@ function showConnectScreen() {
   $('#builder').hidden = true;
   $('#preview').hidden = true;
   resetConnectScreen();
+  loadConnectProjects();
   setSaveStatus('Сохранено');
 }
 
@@ -1109,20 +1112,74 @@ function resetConnectScreen() {
   const form = $('#connect-form');
   const intro = $('#connect-intro');
   const hint = $('#connect-hint');
+  const label = $('#connect-project-label');
+  state.pendingProjectFile = null;
+  state.newProjectOnConnect = false;
   if (form) form.hidden = true;
   if (intro) intro.hidden = false;
   if (hint) hint.hidden = true;
+  if (label) {
+    label.hidden = true;
+    label.textContent = '';
+  }
   hideError('#connect-error');
 }
 
-function showConnectForm() {
+function setConnectField(name, value) {
+  const form = $('#connect-form');
+  const field = form ? form.querySelector('[name="' + name + '"]') : null;
+  if (field && value !== undefined && value !== null) {
+    field.value = value;
+  }
+}
+
+function showConnectForm(options = {}) {
   const form = $('#connect-form');
   if (!form) return;
+
+  if (!state.connectDefaults) {
+    state.connectDefaults = {};
+    form.querySelectorAll('input[name]').forEach((input) => {
+      state.connectDefaults[input.name] = input.value;
+    });
+  }
+
+  state.pendingProjectFile = options.file || null;
+  state.newProjectOnConnect = !!options.fresh;
+
+  if (options.fresh) {
+    Object.entries(state.connectDefaults).forEach(([name, value]) => {
+      setConnectField(name, value);
+    });
+    setConnectField('password', '');
+  } else if (options.file) {
+    setConnectField('host', options.host);
+    setConnectField('dbname', options.database);
+    setConnectField('user', options.user || state.connectDefaults.user);
+    setConnectField('port', options.port);
+    setConnectField('password', '');
+  }
+
+  const label = $('#connect-project-label');
+  if (label) {
+    if (options.file) {
+      label.textContent = options.name || options.database || 'Проект';
+      label.hidden = false;
+    } else {
+      label.textContent = '';
+      label.hidden = true;
+    }
+  }
+
+  hideError('#connect-error');
   $('#connect-intro').hidden = true;
   form.hidden = false;
   $('#connect-hint').hidden = false;
-  const host = form.querySelector('[name="host"]');
-  if (host) host.focus();
+
+  const focusTarget = options.file
+    ? form.querySelector('[name="password"]')
+    : form.querySelector('[name="host"]');
+  if (focusTarget) focusTarget.focus();
 }
 
 function showBuilderScreen() {
@@ -1212,23 +1269,112 @@ function renderAll() {
    Подключение
    ========================================================================= */
 
+function formsWord(count) {
+  const n = Math.abs(Number(count) || 0);
+  const n100 = n % 100;
+  const n10 = n % 10;
+  if (n100 >= 11 && n100 <= 14) return 'форм';
+  if (n10 === 1) return 'форма';
+  if (n10 >= 2 && n10 <= 4) return 'формы';
+  return 'форм';
+}
+
+function formatProjectDate(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+async function loadConnectProjects() {
+  const list = $('#connect-library');
+  if (!list) return;
+  list.innerHTML = '<div class="empty-small">Загрузка…</div>';
+  try {
+    const data = await api('/api/projects');
+    const projects = Array.isArray(data.projects) ? data.projects : [];
+    if (!projects.length) {
+      list.innerHTML =
+        '<div class="empty-small">Сохранённых проектов пока нет.<br>' +
+        'Создайте первый проект кнопкой ниже.</div>';
+      return;
+    }
+    list.innerHTML = projects
+      .map((project) => {
+        const forms = Number(project.forms) || 0;
+        const details = [
+          project.database || 'база не указана',
+          forms + ' ' + formsWord(forms),
+          formatProjectDate(project.modified),
+        ].filter(Boolean);
+        const location = project.host
+          ? project.host + (project.port ? ':' + project.port : '')
+          : '';
+        return (
+          '<button type="button" class="connect-project" data-connect-project="' +
+          escapeAttr(project.file) +
+          '" data-project-name="' + escapeAttr(project.name) +
+          '" data-project-database="' + escapeAttr(project.database || '') +
+          '" data-project-host="' + escapeAttr(project.host || '') +
+          '" data-project-port="' + escapeAttr(String(project.port || '')) +
+          '" data-project-user="' + escapeAttr(project.user || '') + '">' +
+          '<span class="connect-project-main">' +
+          '<b>' + escapeHtml(project.name) + '</b>' +
+          '<small>' + escapeHtml(details.join(' · ')) + '</small>' +
+          (location
+            ? '<small class="connect-project-meta">' + escapeHtml(location) + '</small>'
+            : '') +
+          '</span>' +
+          '<span class="connect-project-open">Открыть →</span>' +
+          '</button>'
+        );
+      })
+      .join('');
+  } catch (error) {
+    list.innerHTML =
+      '<div class="empty-small">Не удалось прочитать список проектов: ' +
+      escapeHtml(error.message) + '</div>';
+  }
+}
+
 function bindConnectScreen() {
   const form = $('#connect-form');
   if (!form) return;
 
-  const startButton = $('#connect-start-btn');
-  if (startButton) {
-    startButton.addEventListener('click', () => {
-      state.newProjectOnConnect = false;
-      showConnectForm();
-    });
-  }
   const newButton = $('#connect-new-btn');
   if (newButton) {
     newButton.addEventListener('click', () => {
-      state.newProjectOnConnect = true;
-      showConnectForm();
-      toast('После подключения будет создан пустой проект', 'info');
+      showConnectForm({ fresh: true });
+    });
+  }
+
+  const backButton = $('#connect-back-btn');
+  if (backButton) {
+    backButton.addEventListener('click', () => {
+      resetConnectScreen();
+      loadConnectProjects();
+    });
+  }
+
+  const library = $('#connect-library');
+  if (library) {
+    library.addEventListener('click', (event) => {
+      const item = event.target.closest('[data-connect-project]');
+      if (!item) return;
+      showConnectForm({
+        file: item.dataset.connectProject,
+        name: item.dataset.projectName,
+        database: item.dataset.projectDatabase,
+        host: item.dataset.projectHost,
+        port: item.dataset.projectPort,
+        user: item.dataset.projectUser,
+      });
     });
   }
 
@@ -1246,6 +1392,9 @@ function bindConnectScreen() {
       port: Number(data.port || 5432),
     };
 
+    const pendingFile = state.pendingProjectFile;
+    const creatingNew = state.newProjectOnConnect;
+
     button.disabled = true;
     button.textContent = 'Подключение…';
     try {
@@ -1254,8 +1403,20 @@ function bindConnectScreen() {
         body: JSON.stringify(payload),
       });
       enterBuilder(result);
-      if (state.newProjectOnConnect) {
-        state.newProjectOnConnect = false;
+      state.pendingProjectFile = null;
+      state.newProjectOnConnect = false;
+      if (pendingFile) {
+        try {
+          const opened = await api('/api/projects/open', {
+            method: 'POST',
+            body: JSON.stringify({ file: pendingFile }),
+          });
+          applyProject(opened.project);
+          toast('Открыт проект «' + (opened.project.name || result.database) + '»', 'success');
+        } catch (error) {
+          toast('Не удалось открыть проект: ' + error.message, 'error');
+        }
+      } else if (creatingNew) {
         try {
           const created = await api('/api/projects/new', { method: 'POST' });
           applyProject(created.project);

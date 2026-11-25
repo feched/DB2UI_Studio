@@ -633,6 +633,7 @@ def storage_meta(params: dict[str, Any]) -> dict[str, Any]:
         "database": _text(params.get("dbname"), 120),
         "host": _text(params.get("host"), 200),
         "port": _clamp_int(params.get("port"), 5432, 1, 65535),
+        "user": _text(params.get("user"), 120),
     }
 
 
@@ -662,6 +663,7 @@ def project_summary(path: Path) -> dict[str, Any] | None:
         "database": _text(meta.get("database"), 120),
         "host": _text(meta.get("host"), 200),
         "port": _clamp_int(meta.get("port"), 5432, 1, 65535),
+        "user": _text(meta.get("user"), 120),
         "forms": len(forms),
         "size": stat.st_size,
         "modified": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
@@ -1121,16 +1123,24 @@ def api_app_export():
 
 @app.get("/api/projects")
 def api_projects_list():
-    state = require_state()
+    """Список сохранённых проектов. Доступен и до подключения к базе."""
+    sid = session.get("sid")
+    state = SESSIONS.get(sid) if sid else None
+    current_path = state["project_path"] if state else None
     items = []
     for path in PROJECTS_DIR.glob("*.json"):
         summary = project_summary(path)
         if not summary:
             continue
-        summary["current"] = path == state["project_path"]
+        summary["current"] = path == current_path
         items.append(summary)
     items.sort(key=lambda item: item["modified"], reverse=True)
-    return jsonify({"projects": items, "current": state["project_path"].name})
+    return jsonify(
+        {
+            "projects": items,
+            "current": current_path.name if current_path else "",
+        }
+    )
 
 
 @app.post("/api/projects/open")
